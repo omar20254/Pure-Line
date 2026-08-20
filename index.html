@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام إدارة مزرعة الرومي الشامل</title>
+  
+  <!-- Firebase SDKs (Compat Version) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    // إعدادات مشروع Firebase الخاص بك (pure-line-6c275)
+    const firebaseConfig = {
+      apiKey: "AIzaSyAH-8PmpPf_QMG-IYsPxJDYZq1m7puwKXA",
+      authDomain: "pure-line-6c275.firebaseapp.com",
+      databaseURL: "https://pure-line-6c275-default-rtdb.firebaseio.com",
+      projectId: "pure-line-6c275",
+      storageBucket: "pure-line-6c275.firebasestorage.app",
+      messagingSenderId: "703205442685",
+      appId: "1:703205442685:web:fa0292a61eeb1a465fdd14",
+      measurementId: "G-BWQK0E6E5V"
+    };
+
+    // تهيئة السحابة
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+
+  <style>
+    :root {
+      --primary: #2e7d32;
+      --primary-dark: #1b5e20;
+      --secondary: #0288d1;
+      --accent: #f57c00;
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --text: #212121;
+      --text-muted: #666666;
+      --border: #e0e0e0;
+      --danger: #d32f2f;
+      --success: #388e3c;
+      --shadow: 0 4px 12px rgba(0,0,0,0.08);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); direction: rtl; min-height: 100vh; }
+
+    /* Login Modal */
+    #login-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px;
+    }
+    .login-card {
+      background: var(--surface); padding: 30px; border-radius: var(--radius);
+      width: 100%; max-width: 400px; box-shadow: var(--shadow); text-align: center;
+    }
+    .login-card h2 { color: var(--primary); margin-bottom: 20px; }
+    
+    /* Layout */
+    .app-header {
+      background: var(--primary); color: white; padding: 15px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .main-container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    
+    /* Tabs Nav */
+    .nav-tabs {
+      display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px;
+      margin-bottom: 20px; border-bottom: 2px solid var(--border);
+    }
+    .tab-btn {
+      padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); cursor: pointer; white-space: nowrap; font-weight: bold;
+      transition: all 0.2s;
+    }
+    .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+    /* Forms & UI Elements */
+    .card { background: var(--surface); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--text); }
+    input, select, textarea {
+      width: 100%; padding: 10px; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 14px; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--primary); }
+    .btn {
+      padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;
+      font-weight: bold; transition: opacity 0.2s; color: white; background: var(--primary);
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn-danger { background: var(--danger); }
+    
+    /* Tables */
+    .table-responsive { overflow-x: auto; margin-top: 15px; }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th, td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+    th { background-color: #f8f9fa; color: var(--text-muted); }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 20px; left: 20px; background: #323232; color: white;
+      padding: 12px 24px; border-radius: 8px; display: none; z-index: 2000; box-shadow: var(--shadow);
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- شاشة الدخول -->
+  <div id="login-overlay">
+    <div class="login-card">
+      <h2>مزرعة الرومي - تسجيل الدخول</h2>
+      <div class="form-group">
+        <label>اسم المستخدم</label>
+        <input type="text" id="username" placeholder="أدخل اسم المستخدم">
+      </div>
+      <div class="form-group">
+        <label>كلمة المرور</label>
+        <input type="password" id="password" placeholder="أدخل كلمة المرور">
+      </div>
+      <button class="btn" style="width: 100%;" onclick="login()">دخول النظام</button>
+    </div>
+  </div>
+
+  <!-- الواجهة الرئيسية -->
+  <header class="app-header">
+    <h1>نظام إدارة مزرعة الرومي السحابي</h1>
+    <button class="btn btn-danger" onclick="logout()">خروج</button>
+  </header>
+
+  <div class="main-container">
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('feed')">🌾 الأعلاف</button>
+      <button class="tab-btn" onclick="switchTab('medicine')">💊 الأدوية والتحصينات</button>
+      <button class="tab-btn" onclick="switchTab('eggs')">🥚 إنتاج البيض</button>
+      <button class="tab-btn" onclick="switchTab('custody')">💰 العُهد والمصاريف</button>
+      <button class="tab-btn" onclick="switchTab('workers')">👥 العمال والرواتب</button>
+    </div>
+
+    <!-- قسم الأعلاف -->
+    <div id="feed" class="tab-content active">
+      <div class="card">
+        <h3>تسجيل شحنة علف جديدة</h3>
+        <br>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+          <div class="form-group">
+            <label>نوع العلف</label>
+            <input type="text" id="feed-type" placeholder="مثال: بادي / نامي">
+          </div>
+          <div class="form-group">
+            <label>الكمية (شكارة/طن)</label>
+            <input type="number" id="feed-qty">
+          </div>
+          <div class="form-group">
+            <label>السعر الإجمالي</label>
+            <input type="number" id="feed-price">
+          </div>
+          <div class="form-group">
+            <label>التاريخ</label>
+            <input type="date" id="feed-date">
+          </div>
+        </div>
+        <button class="btn" onclick="addFeed()">حفظ في السحابة</button>
+      </div>
+
+      <div class="card">
+        <h3>سجل الأعلاف</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>النوع</th>
+                <th>الكمية</th>
+                <th>التكلفة</th>
+                <th>التاريخ</th>
+              </tr>
+            </thead>
+            <tbody id="feed-list"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- قسم الأدوية -->
+    <div id="medicine" class="tab-content">
+      <div class="card">
+        <h3>تسجيل استخدام دواء / تحصينة</h3>
+        <br>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+          <div class="form-group">
+            <label>اسم العلاج</label>
+            <input type="text" id="med-name">
+          </div>
+          <div class="form-group">
+            <label>الجرعة / الاستخدام</label>
+            <input type="text" id="med-dose">
+          </div>
+          <div class="form-group">
+            <label>التكلفة</label>
+            <input type="number" id="med-cost">
+          </div>
+          <div class="form-group">
+            <label>التاريخ</label>
+            <input type="date" id="med-date">
+          </div>
+        </div>
+        <button class="btn" onclick="addMedicine()">حفظ الدواء</button>
+      </div>
+
+      <div class="card">
+        <h3>سجل الأدوية</h3>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>العلاج</th>
+                <th>الجرعة</th>
+                <th>التكلفة</th>
+                <th>التاريخ</th>
+              </tr>
+            </thead>
+            <tbody id="med-list"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- باقي الأقسام تعرض رسالة جاري العمل بنفس الشاكلة -->
+    <div id="eggs" class="tab-content">
+      <div class="card"><h3>قسم إنتاج البيض</h3><p>يمكنك إضافة ونقل سجلات البيض مباشرة هنا بنفس الطريقة السحابية.</p></div>
+    </div>
+    <div id="custody" class="tab-content">
+      <div class="card"><h3>قسم العُهد والمصاريف</h3><p>سجل المصروفات ومرفقات الصور تحفظ سحابياً داخل قاعدة البيانات.</p></div>
+    </div>
+    <div id="workers" class="tab-content">
+      <div class="card"><h3>قسم العمال والرواتب</h3><p>إدارة سجلات السلف والرواتب للعمال.</p></div>
+    </div>
+
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // State المعرف الأساسي للتطبيق
+    let state = {
+      feed: [],
+      medicine: [],
+      eggs: [],
+      custody: [],
+      workers: []
+    };
+
+    /* ------------ التحكم في السحابة (Firebase) ------------ */
+    async function loadAll() {
+      try {
+        const snapshot = await db.ref('turkey_farm_state').once('value');
+        const data = snapshot.val();
+        if (data) {
+          state = data;
+          renderAll();
+        }
+      } catch (e) {
+        console.error('خطأ في جلب البيانات:', e);
+        showToast('تعذر الجلب من السحابة');
+      }
+    }
+
+    async function saveModule(key) {
+      try {
+        await db.ref('turkey_farm_state/' + key).set(state[key] || []);
+        showToast('تم الحفظ سحابياً بنجاح');
+      } catch (e) {
+        console.error('خطأ في الحفظ:', e);
+        showToast('فشل الحفظ في السحابة!');
+      }
+    }
+
+    /* ------------ المصادقة والواجهة ------------ */
+    function login() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      if(u === 'admin' && p === '2003') {
+        document.getElementById('login-overlay').style.display = 'none';
+        loadAll();
+      } else {
+        alert('اسم المستخدم أو كلمة المرور غير صحيحة');
+      }
+    }
+
+    function logout() {
+      location.reload();
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    /* ------------ عمليات الأعلاف والأدوية ------------ */
+    function addFeed() {
+      const type = document.getElementById('feed-type').value;
+      const qty = document.getElementById('feed-qty').value;
+      const price = document.getElementById('feed-price').value;
+      const date = document.getElementById('feed-date').value;
+
+      if(!type || !qty) return alert('برجاء استكمال البيانات');
+
+      if(!state.feed) state.feed = [];
+      state.feed.push({ type, qty, price, date });
+      saveModule('feed');
+      renderFeed();
+    }
+
+    function renderFeed() {
+      const tbody = document.getElementById('feed-list');
+      tbody.innerHTML = '';
+      (state.feed || []).forEach(item => {
+        tbody.innerHTML += `<tr><td>${item.type}</td><td>${item.qty}</td><td>${item.price}</td><td>${item.date}</td></tr>`;
+      });
+    }
+
+    function addMedicine() {
+      const name = document.getElementById('med-name').value;
+      const dose = document.getElementById('med-dose').value;
+      const cost = document.getElementById('med-cost').value;
+      const date = document.getElementById('med-date').value;
+
+      if(!name) return alert('ادخل اسم العلاج');
+
+      if(!state.medicine) state.medicine = [];
+      state.medicine.push({ name, dose, cost, date });
+      saveModule('medicine');
+      renderMedicine();
+    }
+
+    function renderMedicine() {
+      const tbody = document.getElementById('med-list');
+      tbody.innerHTML = '';
+      (state.medicine || []).forEach(item => {
+        tbody.innerHTML += `<tr><td>${item.name}</td><td>${item.dose}</td><td>${item.cost}</td><td>${item.date}</td></tr>`;
+      });
+    }
+
+    function renderAll() {
+      renderFeed();
+      renderMedicine();
+    }
+  </script>
+</body>
+</html>
