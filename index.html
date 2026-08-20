@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>نظام إدارة مزرعة الرومي الشامل</title>
-  
+  <title>نظام إدارة مزرعة الرومي</title>
+
   <!-- Firebase SDKs (Compat Version) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -45,265 +45,408 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-    body { background-color: var(--bg); color: var(--text); direction: rtl; min-height: 100vh; }
+    body { background-color: var(--bg); color: var(--text); direction: rtl; padding-bottom: 60px; }
 
     /* Login Modal */
-    #login-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
-      z-index: 1000; padding: 20px;
+    #login-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center; z-index: 1000;
     }
-    .login-card {
-      background: var(--surface); padding: 30px; border-radius: var(--radius);
-      width: 100%; max-width: 400px; box-shadow: var(--shadow); text-align: center;
+    .login-box {
+      background: var(--surface); padding: 32px; border-radius: var(--radius);
+      box-shadow: var(--shadow); width: 100%; max-width: 380px; text-align: center;
     }
-    .login-card h2 { color: var(--primary); margin-bottom: 20px; }
-    
-    /* Layout */
-    .app-header {
-      background: var(--primary); color: white; padding: 15px 20px;
+    .login-box h2 { margin-bottom: 24px; color: var(--primary); }
+
+    /* Navbar Header */
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+    .header-container {
+      max-width: 1200px; margin: 0 auto; padding: 12px 20px;
       display: flex; justify-content: space-between; align-items: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
-    .main-container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .brand { font-size: 1.25rem; font-weight: bold; color: var(--primary-dark); display: flex; align-items: center; gap: 8px; }
+
+    /* Main Container & Tabs */
+    .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
     
-    /* Tabs Nav */
     .nav-tabs {
-      display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px;
-      margin-bottom: 20px; border-bottom: 2px solid var(--border);
+      display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px;
+      margin-bottom: 24px; border-bottom: 2px solid var(--border);
     }
     .tab-btn {
-      padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); cursor: pointer; white-space: nowrap; font-weight: bold;
-      transition: all 0.2s;
+      padding: 10px 16px; border: none; background: transparent; border-radius: 8px;
+      font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: all 0.2s;
     }
-    .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-
-    /* Forms & UI Elements */
-    .card { background: var(--surface); padding: 20px; border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; }
-    .form-group { margin-bottom: 15px; }
-    label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--text); }
-    input, select, textarea {
-      width: 100%; padding: 10px; border: 1px solid var(--border);
-      border-radius: 6px; font-size: 14px; outline: none;
-    }
-    input:focus, select:focus { border-color: var(--primary); }
-    .btn {
-      padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;
-      font-weight: bold; transition: opacity 0.2s; color: white; background: var(--primary);
-    }
-    .btn:hover { opacity: 0.9; }
-    .btn-danger { background: var(--danger); }
-    
-    /* Tables */
-    .table-responsive { overflow-x: auto; margin-top: 15px; }
-    table { width: 100%; border-collapse: collapse; text-align: right; }
-    th, td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
-    th { background-color: #f8f9fa; color: var(--text-muted); }
-
-    /* Toast */
-    #toast {
-      position: fixed; bottom: 20px; left: 20px; background: #323232; color: white;
-      padding: 12px 24px; border-radius: 8px; display: none; z-index: 2000; box-shadow: var(--shadow);
-    }
+    .tab-btn:hover { background: rgba(0,0,0,0.04); }
+    .tab-btn.active { background: var(--primary); color: white; }
 
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+
+    /* Cards & Form Control */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .card { background: var(--surface); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 16px; color: var(--primary-dark); display: flex; align-items: center; justify-content: space-between; }
+    
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--text-muted); }
+    .form-control {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.95rem; background: var(--bg); transition: border-color 0.2s;
+    }
+    .form-control:focus { outline: none; border-color: var(--primary); background: #fff; }
+
+    /* Buttons */
+    .btn {
+      padding: 10px 18px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-secondary { background: var(--secondary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-block { width: 100%; }
+
+    /* Tables & Stats */
+    .stat-card { text-align: center; padding: 16px; background: #e8f5e9; border-radius: var(--radius); }
+    .stat-value { font-size: 1.5rem; font-weight: bold; color: var(--primary-dark); }
+    .stat-label { font-size: 0.85rem; color: var(--text-muted); }
+
+    .table-responsive { overflow-x: auto; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th, td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    th { background: var(--bg); color: var(--text-muted); font-weight: 600; }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed; bottom: 20px; left: 20px; background: #323232; color: #fff;
+      padding: 12px 20px; border-radius: 8px; display: none; z-index: 2000; box-shadow: var(--shadow);
+    }
+    
+    .img-preview { max-width: 100%; height: 120px; object-fit: cover; border-radius: 8px; margin-top: 8px; }
   </style>
 </head>
 <body>
 
   <!-- شاشة الدخول -->
-  <div id="login-overlay">
-    <div class="login-card">
-      <h2>مزرعة الرومي - تسجيل الدخول</h2>
+  <div id="login-modal">
+    <div class="login-box">
+      <h2>تسجيل الدخول</h2>
       <div class="form-group">
         <label>اسم المستخدم</label>
-        <input type="text" id="username" placeholder="أدخل اسم المستخدم">
+        <input type="text" id="login-username" class="form-control">
       </div>
       <div class="form-group">
         <label>كلمة المرور</label>
-        <input type="password" id="password" placeholder="أدخل كلمة المرور">
+        <input type="password" id="login-password" class="form-control">
       </div>
-      <button class="btn" style="width: 100%;" onclick="login()">دخول النظام</button>
+      <button class="btn btn-primary btn-block" onclick="login()">دخول</button>
     </div>
   </div>
 
-  <!-- الواجهة الرئيسية -->
-  <header class="app-header">
-    <h1>نظام إدارة مزرعة الرومي السحابي</h1>
-    <button class="btn btn-danger" onclick="logout()">خروج</button>
+  <!-- الشريط العلوي -->
+  <header>
+    <div class="header-container">
+      <div class="brand">🦃 نظام إدارة مزرعة الرومي</div>
+      <button class="btn btn-danger" onclick="logout()">تسجيل الخروج</button>
+    </div>
   </header>
 
-  <div class="main-container">
+  <main class="container">
+    <!-- أزرار التنقل بين الأقسام -->
     <div class="nav-tabs">
       <button class="tab-btn active" onclick="switchTab('feed')">🌾 الأعلاف</button>
-      <button class="tab-btn" onclick="switchTab('medicine')">💊 الأدوية والتحصينات</button>
-      <button class="tab-btn" onclick="switchTab('eggs')">🥚 إنتاج البيض</button>
+      <button class="tab-btn" onclick="switchTab('meds')">💊 الأدوية والتحصينات</button>
+      <button class="tab-btn" onclick="switchTab('eggs')">🥚 البيض والإنتاج</button>
       <button class="tab-btn" onclick="switchTab('custody')">💰 العُهد والمصاريف</button>
       <button class="tab-btn" onclick="switchTab('workers')">👥 العمال والرواتب</button>
     </div>
 
     <!-- قسم الأعلاف -->
-    <div id="feed" class="tab-content active">
-      <div class="card">
-        <h3>تسجيل شحنة علف جديدة</h3>
-        <br>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+    <div id="tab-feed" class="tab-content active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">إضافة شحنة علف جديدة</div>
           <div class="form-group">
             <label>نوع العلف</label>
-            <input type="text" id="feed-type" placeholder="مثال: بادي / نامي">
+            <input type="text" id="feed-type" class="form-control" placeholder="مثال: بادي / نامي">
           </div>
           <div class="form-group">
-            <label>الكمية (شكارة/طن)</label>
-            <input type="number" id="feed-qty">
+            <label>الكمية (بالشكارة أو الطن)</label>
+            <input type="number" id="feed-qty" class="form-control">
           </div>
           <div class="form-group">
-            <label>السعر الإجمالي</label>
-            <input type="number" id="feed-price">
+            <label>الإجمالي (جنيه)</label>
+            <input type="number" id="feed-cost" class="form-control">
           </div>
           <div class="form-group">
             <label>التاريخ</label>
-            <input type="date" id="feed-date">
+            <input type="date" id="feed-date" class="form-control">
           </div>
+          <button class="btn btn-primary btn-block" onclick="addFeed()">حفظ سحابياً</button>
         </div>
-        <button class="btn" onclick="addFeed()">حفظ في السحابة</button>
-      </div>
 
-      <div class="card">
-        <h3>سجل الأعلاف</h3>
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>النوع</th>
-                <th>الكمية</th>
-                <th>التكلفة</th>
-                <th>التاريخ</th>
-              </tr>
-            </thead>
-            <tbody id="feed-list"></tbody>
-          </table>
+        <div class="card">
+          <div class="card-title">سجل استهلاك الوارد من الأعلاف</div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>النوع</th>
+                  <th>الكمية</th>
+                  <th>التكلفة</th>
+                  <th>التاريخ</th>
+                </tr>
+              </thead>
+              <tbody id="feed-table"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- قسم الأدوية -->
-    <div id="medicine" class="tab-content">
-      <div class="card">
-        <h3>تسجيل استخدام دواء / تحصينة</h3>
-        <br>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+    <div id="tab-meds" class="tab-content">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">إضافة علاجات وتطعيمات</div>
           <div class="form-group">
-            <label>اسم العلاج</label>
-            <input type="text" id="med-name">
+            <label>اسم العلاج/اللقاح</label>
+            <input type="text" id="med-name" class="form-control">
           </div>
           <div class="form-group">
-            <label>الجرعة / الاستخدام</label>
-            <input type="text" id="med-dose">
+            <label>الجرعة واستخدامها</label>
+            <input type="text" id="med-dose" class="form-control">
           </div>
           <div class="form-group">
-            <label>التكلفة</label>
-            <input type="number" id="med-cost">
+            <label>التكلفة (جنيه)</label>
+            <input type="number" id="med-cost" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>تاريخ الجرعة</label>
+            <input type="date" id="med-date" class="form-control">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="addMed()">حفظ العلاج</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">سجل الأدوية والتحصينات</div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>اسم العلاج</th>
+                  <th>الجرعة</th>
+                  <th>التكلفة</th>
+                  <th>التاريخ</th>
+                </tr>
+              </thead>
+              <tbody id="med-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- قسم البيض والإنتاج والنافق -->
+    <div id="tab-eggs" class="tab-content">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">تسجيل الجمع اليومي والنافق</div>
+          <div class="form-group">
+            <label>عدد البيض السليم</label>
+            <input type="number" id="egg-count" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>عدد البيض المكسور / التالف</label>
+            <input type="number" id="egg-broken" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>عدد النافق (الميت)</label>
+            <input type="number" id="dead-count" class="form-control">
           </div>
           <div class="form-group">
             <label>التاريخ</label>
-            <input type="date" id="med-date">
+            <input type="date" id="egg-date" class="form-control">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="addEggRecord()">تسجيل البيانات</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">سجل الإنتاج والنافق اليومي</div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>بيض سليم</th>
+                  <th>بيض مكسور</th>
+                  <th>نافق</th>
+                  <th>التاريخ</th>
+                </tr>
+              </thead>
+              <tbody id="egg-table"></tbody>
+            </table>
           </div>
         </div>
-        <button class="btn" onclick="addMedicine()">حفظ الدواء</button>
       </div>
+    </div>
 
-      <div class="card">
-        <h3>سجل الأدوية</h3>
-        <div class="table-responsive">
-          <table>
-            <thead>
-              <tr>
-                <th>العلاج</th>
-                <th>الجرعة</th>
-                <th>التكلفة</th>
-                <th>التاريخ</th>
-              </tr>
-            </thead>
-            <tbody id="med-list"></tbody>
-          </table>
+    <!-- قسم العُهد والمصاريف وقراءة صورة الفواتير -->
+    <div id="tab-custody" class="tab-content">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">تسجيل مصروف جديد من العهدة</div>
+          <div class="form-group">
+            <label>بيان المصروف</label>
+            <input type="text" id="custody-item" class="form-control" placeholder="مثال: صيانة، كهرباء، انتقالات">
+          </div>
+          <div class="form-group">
+            <label>المبلغ (جنيه)</label>
+            <input type="number" id="custody-amount" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>صورة الفاتورة/الإيصال (اختياري)</label>
+            <input type="file" id="custody-file" accept="image/*" class="form-control" onchange="previewInvoice(event)">
+            <img id="invoice-preview" class="img-preview" style="display:none;">
+          </div>
+          <div class="form-group">
+            <label>التاريخ</label>
+            <input type="date" id="custody-date" class="form-control">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="addCustody()">إضافة المصروف</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">سجل المصروفات المباشرة للفواتير</div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>البيان</th>
+                  <th>المبلغ</th>
+                  <th>الفاتورة</th>
+                  <th>التاريخ</th>
+                </tr>
+              </thead>
+              <tbody id="custody-table"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- باقي الأقسام تعرض رسالة جاري العمل بنفس الشاكلة -->
-    <div id="eggs" class="tab-content">
-      <div class="card"><h3>قسم إنتاج البيض</h3><p>يمكنك إضافة ونقل سجلات البيض مباشرة هنا بنفس الطريقة السحابية.</p></div>
-    </div>
-    <div id="custody" class="tab-content">
-      <div class="card"><h3>قسم العُهد والمصاريف</h3><p>سجل المصروفات ومرفقات الصور تحفظ سحابياً داخل قاعدة البيانات.</p></div>
-    </div>
-    <div id="workers" class="tab-content">
-      <div class="card"><h3>قسم العمال والرواتب</h3><p>إدارة سجلات السلف والرواتب للعمال.</p></div>
+    <!-- قسم العمال والرواتب -->
+    <div id="tab-workers" class="tab-content">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">تسجيل سلفة / راتب عامل</div>
+          <div class="form-group">
+            <label>اسم العامل</label>
+            <input type="text" id="worker-name" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>نوع العملية</label>
+            <select id="worker-type" class="form-control">
+              <option value="راتب">راتب شهري</option>
+              <option value="سلفة">سلفة مقدمة</option>
+              <option value="مكافأة">مكافأة</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>المبلغ (جنيه)</label>
+            <input type="number" id="worker-amount" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>التاريخ</label>
+            <input type="date" id="worker-date" class="form-control">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="addWorkerPay()">تسجيل العملية</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">سجل العمال والسُلف والرواتب</div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>اسم العامل</th>
+                  <th>النوع</th>
+                  <th>المبلغ</th>
+                  <th>التاريخ</th>
+                </tr>
+              </thead>
+              <tbody id="worker-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
 
-  </div>
+  </main>
 
   <div id="toast"></div>
 
   <script>
-    // State المعرف الأساسي للتطبيق
+    // الهيكل البرمجي لحفظ كافة عناصر النظام
     let state = {
       feed: [],
-      medicine: [],
+      meds: [],
       eggs: [],
       custody: [],
       workers: []
     };
 
-    /* ------------ التحكم في السحابة (Firebase) ------------ */
-    async function loadAll() {
+    let currentInvoiceBase64 = "";
+
+    /* ------------ ربط Firebase السحابي ------------ */
+    async function loadAll(){
       try {
         const snapshot = await db.ref('turkey_farm_state').once('value');
         const data = snapshot.val();
-        if (data) {
+        if(data) {
           state = data;
           renderAll();
         }
-      } catch (e) {
-        console.error('خطأ في جلب البيانات:', e);
-        showToast('تعذر الجلب من السحابة');
+      } catch(e) {
+        console.error('فشل جلب البيانات السحابية:', e);
       }
     }
 
-    async function saveModule(key) {
-      try {
+    async function saveModule(key){
+      try{
         await db.ref('turkey_farm_state/' + key).set(state[key] || []);
-        showToast('تم الحفظ سحابياً بنجاح');
-      } catch (e) {
-        console.error('خطأ في الحفظ:', e);
-        showToast('فشل الحفظ في السحابة!');
+        showToast('تم الحفظ السحابي بنجاح');
+      }catch(e){ 
+        console.error('فشل الحفظ السحابي:', e); 
+        showToast('تعذر حفظ البيانات سحابياً'); 
       }
     }
 
-    /* ------------ المصادقة والواجهة ------------ */
-    function login() {
-      const u = document.getElementById('username').value;
-      const p = document.getElementById('password').value;
-      if(u === 'admin' && p === '2003') {
-        document.getElementById('login-overlay').style.display = 'none';
+    /* ------------ المصادقة والتحكم ------------ */
+    function login(){
+      const u = document.getElementById('login-username').value;
+      const p = document.getElementById('login-password').value;
+      if(u === 'admin' && p === '2003'){
+        document.getElementById('login-modal').style.display = 'none';
         loadAll();
       } else {
-        alert('اسم المستخدم أو كلمة المرور غير صحيحة');
+        alert('بيانات الدخول غير صحيحة!');
       }
     }
 
-    function logout() {
+    function logout(){
       location.reload();
     }
 
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    function switchTab(tabKey){
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       
-      document.getElementById(tabId).classList.add('active');
       event.target.classList.add('active');
+      document.getElementById('tab-' + tabKey).classList.add('active');
     }
 
     function showToast(msg) {
@@ -313,54 +456,141 @@
       setTimeout(() => { t.style.display = 'none'; }, 3000);
     }
 
-    /* ------------ عمليات الأعلاف والأدوية ------------ */
-    function addFeed() {
+    /* ------------ وظائف الأعلاف ------------ */
+    function addFeed(){
       const type = document.getElementById('feed-type').value;
       const qty = document.getElementById('feed-qty').value;
-      const price = document.getElementById('feed-price').value;
+      const cost = document.getElementById('feed-cost').value;
       const date = document.getElementById('feed-date').value;
 
-      if(!type || !qty) return alert('برجاء استكمال البيانات');
+      if(!type || !qty) return alert('الرجاء إدخال البيانات المطلوبة');
 
       if(!state.feed) state.feed = [];
-      state.feed.push({ type, qty, price, date });
+      state.feed.push({ type, qty, cost, date });
       saveModule('feed');
       renderFeed();
     }
 
-    function renderFeed() {
-      const tbody = document.getElementById('feed-list');
+    function renderFeed(){
+      const tbody = document.getElementById('feed-table');
       tbody.innerHTML = '';
       (state.feed || []).forEach(item => {
-        tbody.innerHTML += `<tr><td>${item.type}</td><td>${item.qty}</td><td>${item.price}</td><td>${item.date}</td></tr>`;
+        tbody.innerHTML += `<tr><td>${item.type}</td><td>${item.qty}</td><td>${item.cost || 0}</td><td>${item.date}</td></tr>`;
       });
     }
 
-    function addMedicine() {
+    /* ------------ وظائف الأدوية ------------ */
+    function addMed(){
       const name = document.getElementById('med-name').value;
       const dose = document.getElementById('med-dose').value;
       const cost = document.getElementById('med-cost').value;
       const date = document.getElementById('med-date').value;
 
-      if(!name) return alert('ادخل اسم العلاج');
+      if(!name) return alert('الرجاء إدخال اسم العلاج');
 
-      if(!state.medicine) state.medicine = [];
-      state.medicine.push({ name, dose, cost, date });
-      saveModule('medicine');
-      renderMedicine();
+      if(!state.meds) state.meds = [];
+      state.meds.push({ name, dose, cost, date });
+      saveModule('meds');
+      renderMeds();
     }
 
-    function renderMedicine() {
-      const tbody = document.getElementById('med-list');
+    function renderMeds(){
+      const tbody = document.getElementById('med-table');
       tbody.innerHTML = '';
-      (state.medicine || []).forEach(item => {
-        tbody.innerHTML += `<tr><td>${item.name}</td><td>${item.dose}</td><td>${item.cost}</td><td>${item.date}</td></tr>`;
+      (state.meds || []).forEach(item => {
+        tbody.innerHTML += `<tr><td>${item.name}</td><td>${item.dose}</td><td>${item.cost || 0}</td><td>${item.date}</td></tr>`;
       });
     }
 
-    function renderAll() {
+    /* ------------ وظائف البيض والإنتاج والنافق ------------ */
+    function addEggRecord(){
+      const count = document.getElementById('egg-count').value;
+      const broken = document.getElementById('egg-broken').value;
+      const dead = document.getElementById('dead-count').value;
+      const date = document.getElementById('egg-date').value;
+
+      if(!state.eggs) state.eggs = [];
+      state.eggs.push({ count, broken, dead, date });
+      saveModule('eggs');
+      renderEggs();
+    }
+
+    function renderEggs(){
+      const tbody = document.getElementById('egg-table');
+      tbody.innerHTML = '';
+      (state.eggs || []).forEach(item => {
+        tbody.innerHTML += `<tr><td>${item.count || 0}</td><td>${item.broken || 0}</td><td>${item.dead || 0}</td><td>${item.date}</td></tr>`;
+      });
+    }
+
+    /* ------------ وظائف المصاريف والفواتير ------------ */
+    function previewInvoice(event){
+      const file = event.target.files[0];
+      if(file){
+        const reader = new FileReader();
+        reader.onload = function(e){
+          currentInvoiceBase64 = e.target.result;
+          const img = document.getElementById('invoice-preview');
+          img.src = currentInvoiceBase64;
+          img.style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function addCustody(){
+      const item = document.getElementById('custody-item').value;
+      const amount = document.getElementById('custody-amount').value;
+      const date = document.getElementById('custody-date').value;
+
+      if(!item || !amount) return alert('الرجاء تعبئة بيانات المصروف');
+
+      if(!state.custody) state.custody = [];
+      state.custody.push({ item, amount, img: currentInvoiceBase64, date });
+      saveModule('custody');
+      renderCustody();
+      currentInvoiceBase64 = "";
+      document.getElementById('invoice-preview').style.display = 'none';
+    }
+
+    function renderCustody(){
+      const tbody = document.getElementById('custody-table');
+      tbody.innerHTML = '';
+      (state.custody || []).forEach(item => {
+        const imgTag = item.img ? `<a href="${item.img}" target="_blank">عرض الفاتورة</a>` : 'لا يوجد';
+        tbody.innerHTML += `<tr><td>${item.item}</td><td>${item.amount}</td><td>${imgTag}</td><td>${item.date}</td></tr>`;
+      });
+    }
+
+    /* ------------ وظائف العمال والرواتب ------------ */
+    function addWorkerPay(){
+      const name = document.getElementById('worker-name').value;
+      const type = document.getElementById('worker-type').value;
+      const amount = document.getElementById('worker-amount').value;
+      const date = document.getElementById('worker-date').value;
+
+      if(!name || !amount) return alert('الرجاء استكمال البيانات');
+
+      if(!state.workers) state.workers = [];
+      state.workers.push({ name, type, amount, date });
+      saveModule('workers');
+      renderWorkers();
+    }
+
+    function renderWorkers(){
+      const tbody = document.getElementById('worker-table');
+      tbody.innerHTML = '';
+      (state.workers || []).forEach(item => {
+        tbody.innerHTML += `<tr><td>${item.name}</td><td>${item.type}</td><td>${item.amount}</td><td>${item.date}</td></tr>`;
+      });
+    }
+
+    function renderAll(){
       renderFeed();
-      renderMedicine();
+      renderMeds();
+      renderEggs();
+      renderCustody();
+      renderWorkers();
     }
   </script>
 </body>
