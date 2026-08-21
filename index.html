@@ -6,10 +6,9 @@
 <title>نظام إدارة مزرعة الرومي</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-
- <!-- Firebase SDKs (Compat Version) -->
- <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
- <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <!-- Firebase SDKs (Compat Version) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
   <script>
     // إعدادات مشروع Firebase الخاص بك (pure-line-6c275)
@@ -24,9 +23,20 @@
       measurementId: "G-BWQK0E6E5V"
     };
 
-    // تهيئة السحابة
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    // تهيئة السحابة (بشكل آمن — لو مكتبة Firebase مش محمّلة، النظام يشتغل محليًا بدل ما يتوقف بالكامل)
+    let db = null;
+    let firebaseReady = false;
+    try{
+      if(typeof firebase === 'undefined'){
+        throw new Error('Firebase SDK لم يتم تحميله (قد يكون المتصفح أو المعاينة تمنع تحميل سكريبتات خارجية)');
+      }
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      firebaseReady = true;
+    }catch(e){
+      console.error('Firebase init failed:', e.message);
+      firebaseReady = false;
+    }
   </script>
   <style>
   :root{
@@ -357,7 +367,7 @@
       </div>
       <button type="submit" class="btn btn-primary">تسجيل الدخول</button>
     </form>
-    <div class="login-hint">بيانات الدخول الافتراضية — admin / 2003</div>
+    <div class="login-hint">Eng_OmarRashad</div>
   </div>
 </div>
 
@@ -452,19 +462,59 @@ let state = {
 };
 let currentPage = 'dashboard';
 
-/* ---------------- storage helpers ---------------- */
+// نسخة أصلية من شكل البيانات الافتراضي، تُستخدم لإصلاح أي بيانات ناقصة أو تالفة قادمة من السحابة
+const DEFAULT_STATE_SHAPE = {
+  feed: {receipts:[], consumption:[]},
+  med: {receipts:[], usage:[]},
+  egg: {daily:[]},
+  custody: {custodyEntries:[], expenses:[]},
+  hr: {workers:[], advances:[]},
+};
+
+// يتأكد أن كل موديول فيه المصفوفات المتوقعة (وليست undefined/كائن مشوّه)، ويحوّل أي كائن قادم من Firebase (بدل مصفوفة) لمصفوفة آمنة
+function normalizeModule(key, val){
+  const shape = DEFAULT_STATE_SHAPE[key];
+  const out = {};
+  Object.keys(shape).forEach(field=>{
+    const incoming = val && val[field];
+    if(Array.isArray(incoming)){
+      out[field] = incoming.filter(Boolean); // يشيل أي فراغات ناتجة عن تخزين Firebase للمصفوفات كـ object متقطّع
+    }else if(incoming && typeof incoming === 'object'){
+      // Firebase أحيانًا يخزّن المصفوفة كـ object بمفاتيح رقمية — نحوّلها هنا لمصفوفة عادية
+      out[field] = Object.values(incoming).filter(Boolean);
+    }else{
+      out[field] = [];
+    }
+  });
+  return out;
+}
+
+/* ---------------- storage helpers (Firebase Realtime Database) ---------------- */
 async function loadAll(){
+  if(!firebaseReady){
+    showToast('⚠️ تعذر الاتصال بقاعدة البيانات السحابية — يعمل النظام محليًا فقط الآن');
+    return;
+  }
   const keys = ['feed','med','egg','custody','hr'];
   for(const k of keys){
     try{
-      const res = await window.storage.get(k, false);
-      if(res && res.value) state[k] = JSON.parse(res.value);
-    }catch(e){ /* key not found yet — keep defaults */ }
+      const snap = await db.ref('farmData/' + k).once('value');
+      const val = snap.val();
+      state[k] = normalizeModule(k, val);
+    }catch(e){
+      console.error('load failed for', k, e);
+      state[k] = normalizeModule(k, null);
+      showToast('تعذر تحميل البيانات من السحابة، تحقق من الاتصال');
+    }
   }
 }
 async function saveModule(key){
+  if(!firebaseReady){
+    showToast('⚠️ لم يتم الحفظ سحابيًا — تعذر الاتصال بـ Firebase');
+    return;
+  }
   try{
-    await window.storage.set(key, JSON.stringify(state[key]), false);
+    await db.ref('farmData/' + key).set(state[key]);
   }catch(e){ console.error('storage save failed', e); showToast('تعذر حفظ البيانات، حاول مرة أخرى'); }
 }
 
@@ -512,9 +562,21 @@ async function startApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('todayPill').textContent = '📅 ' + fmtDate(todayISO());
-  await loadAll();
-  buildNav();
-  renderPage('dashboard');
+  try{
+    await loadAll();
+    buildNav();
+    renderPage('dashboard');
+  }catch(err){
+    console.error('startApp error:', err);
+    const c = document.getElementById('pageContent');
+    if(c) c.innerHTML = `
+      <div class="panel" style="border-color:var(--danger);">
+        <div class="panel-head"><h3 style="color:var(--danger);">⚠️ تعذر تشغيل النظام</h3></div>
+        <div class="panel-body" style="font-size:13px; color:var(--ink-soft);">
+          <pre style="white-space:pre-wrap; background:var(--cream); padding:10px; border-radius:8px; font-size:11.5px; direction:ltr; text-align:left;">${escapeHtml(err.message||String(err))}</pre>
+        </div>
+      </div>`;
+  }
 }
 
 /* ---------------- mobile sidebar ---------------- */
@@ -558,7 +620,19 @@ function renderPage(page){
     hr: renderHR,
     reports: renderReports,
   };
-  c.innerHTML = renderers[page]();
+  try{
+    c.innerHTML = renderers[page]();
+  }catch(err){
+    console.error('renderPage error:', err);
+    c.innerHTML = `
+      <div class="panel" style="border-color:var(--danger);">
+        <div class="panel-head"><h3 style="color:var(--danger);">⚠️ حدث خطأ أثناء عرض هذه الصفحة</h3></div>
+        <div class="panel-body" style="font-size:13px; color:var(--ink-soft);">
+          <p>تعذر تحميل محتوى "${escapeHtml(meta.label)}". فضلاً أرسل هذه الرسالة لصاحب النظام:</p>
+          <pre style="white-space:pre-wrap; background:var(--cream); padding:10px; border-radius:8px; font-size:11.5px; direction:ltr; text-align:left;">${escapeHtml(err.message||String(err))}</pre>
+        </div>
+      </div>`;
+  }
   if(page==='hr') initHRMonthFilter();
 }
 
@@ -703,23 +777,38 @@ function renderFeed(){
   <div class="panel">
     <div class="panel-head"><h3>${ICONS.feed} استلام شحنات العلف</h3></div>
     <div class="panel-body">
-      <form class="inline-form" onsubmit="return addFeedReceipt(event)">
+      <form class="inline-form" onsubmit="return addFeedReceipt(event)" enctype="multipart/form-data">
         <div class="f"><label>التاريخ</label><input type="date" id="fr_date" value="${todayISO()}" required></div>
         <div class="f"><label>نوع العلف</label><input type="text" id="fr_type" placeholder="بادئ / نامي / ..." required></div>
         <div class="f"><label>الكمية (كجم)</label><input type="number" id="fr_qty" min="0" step="0.1" required></div>
         <div class="f"><label>المورد</label><input type="text" id="fr_supplier" placeholder="اسم المورد"></div>
         <div class="f"><label>السعر (ج.م)</label><input type="number" id="fr_price" min="0" step="0.01"></div>
+        <div class="f">
+          <label>صورة الفاتورة</label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('fr_receipt_camera').click()">📷 التقاط صورة</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('fr_receipt_gallery').click()">🖼️ من المعرض</button>
+          </div>
+          <input type="file" id="fr_receipt_camera" accept="image/*" capture="environment" style="display:none" onchange="handleReceiptFileSelect(this,'fr')">
+          <input type="file" id="fr_receipt_gallery" accept="image/*" style="display:none" onchange="handleReceiptFileSelect(this,'fr')">
+          <div id="fr_receipt_preview" style="display:none; align-items:center; gap:8px; margin-top:6px;">
+            <img id="fr_receipt_preview_img" style="width:40px;height:40px;object-fit:cover;border-radius:7px;border:1px solid var(--line);">
+            <span style="font-size:12px; color:var(--ink-soft);">تم اختيار صورة</span>
+            <button type="button" class="del-btn" onclick="clearReceiptFile('fr')">${ICONS.trash}</button>
+          </div>
+        </div>
         <button class="btn btn-gold" type="submit">إضافة استلام</button>
       </form>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية (كجم)</th><th>المورد</th><th>السعر</th><th></th></tr></thead>
+        <thead><tr><th>التاريخ</th><th>النوع</th><th>الكمية (كجم)</th><th>المورد</th><th>السعر</th><th>الفاتورة</th><th></th></tr></thead>
         <tbody>
           ${listRows(state.feed.receipts, r=>`
             <tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.type)}</td><td>${fmtNum(r.qty)}</td><td>${escapeHtml(r.supplier||'—')}</td><td>${r.price?fmtNum(r.price)+' ج.م':'—'}</td>
+            <td>${r.receiptImage ? `<img src="${r.receiptImage}" alt="فاتورة" style="width:42px;height:42px;object-fit:cover;border-radius:7px;border:1px solid var(--line);cursor:pointer;" onclick="openLightbox('${r.receiptImage}')">` : '—'}</td>
             <td><button class="del-btn" onclick="deleteItem('feed','receipts','${r.id}')">${ICONS.trash}</button></td></tr>
-          `, 6)}
+          `, 7)}
         </tbody>
       </table>
     </div>
@@ -756,11 +845,17 @@ function listRows(arr, tpl, colspan){
 }
 async function addFeedReceipt(e){
   e.preventDefault();
+  let receiptImage = null;
+  if(pendingFiles['fr']){
+    try{ receiptImage = await resizeImageFile(pendingFiles['fr']); }
+    catch(err){ showToast('تعذر تحميل صورة الفاتورة، تم الحفظ بدونها'); }
+  }
   state.feed.receipts.push({
     id:uid(), _created:Date.now(),
     date:val('fr_date'), type:val('fr_type'), qty:val('fr_qty'),
-    supplier:val('fr_supplier'), price:val('fr_price')
+    supplier:val('fr_supplier'), price:val('fr_price'), receiptImage
   });
+  pendingFiles['fr'] = null;
   await saveModule('feed');
   renderPage('feed'); showToast('تم تسجيل استلام العلف');
   return false;
@@ -793,18 +888,32 @@ function renderMed(){
   <div class="panel">
     <div class="panel-head"><h3>${ICONS.med} استلام الأدوية والمكملات</h3></div>
     <div class="panel-body">
-      <form class="inline-form" onsubmit="return addMedReceipt(event)">
+      <form class="inline-form" onsubmit="return addMedReceipt(event)" enctype="multipart/form-data">
         <div class="f"><label>التاريخ</label><input type="date" id="mr_date" value="${todayISO()}" required></div>
         <div class="f"><label>اسم الدواء</label><input type="text" id="mr_name" required></div>
         <div class="f"><label>الكمية</label><input type="number" id="mr_qty" min="0" step="0.1" required></div>
         <div class="f"><label>تاريخ الانتهاء</label><input type="date" id="mr_expiry"></div>
         <div class="f"><label>السعر (ج.م)</label><input type="number" id="mr_price" min="0" step="0.01"></div>
+        <div class="f">
+          <label>صورة الفاتورة</label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('mr_receipt_camera').click()">📷 التقاط صورة</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('mr_receipt_gallery').click()">🖼️ من المعرض</button>
+          </div>
+          <input type="file" id="mr_receipt_camera" accept="image/*" capture="environment" style="display:none" onchange="handleReceiptFileSelect(this,'mr')">
+          <input type="file" id="mr_receipt_gallery" accept="image/*" style="display:none" onchange="handleReceiptFileSelect(this,'mr')">
+          <div id="mr_receipt_preview" style="display:none; align-items:center; gap:8px; margin-top:6px;">
+            <img id="mr_receipt_preview_img" style="width:40px;height:40px;object-fit:cover;border-radius:7px;border:1px solid var(--line);">
+            <span style="font-size:12px; color:var(--ink-soft);">تم اختيار صورة</span>
+            <button type="button" class="del-btn" onclick="clearReceiptFile('mr')">${ICONS.trash}</button>
+          </div>
+        </div>
         <button class="btn btn-gold" type="submit">إضافة استلام</button>
       </form>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>التاريخ</th><th>اسم الدواء</th><th>الكمية</th><th>تاريخ الانتهاء</th><th>السعر</th><th></th></tr></thead>
+        <thead><tr><th>التاريخ</th><th>اسم الدواء</th><th>الكمية</th><th>تاريخ الانتهاء</th><th>السعر</th><th>الفاتورة</th><th></th></tr></thead>
         <tbody>
           ${listRows(state.med.receipts, r=>{
             const isExpiring = r.expiry && (new Date(r.expiry) - new Date()) < 1000*60*60*24*30 && (new Date(r.expiry) - new Date()) > 0;
@@ -813,8 +922,9 @@ function renderMed(){
             <tr><td>${fmtDate(r.date)}</td><td>${escapeHtml(r.name)}</td><td>${fmtNum(r.qty)}</td>
             <td>${r.expiry?fmtDate(r.expiry):'—'} ${isExpired?'<span class="tag tag-danger">منتهي</span>':isExpiring?'<span class="tag tag-warn">قريب الانتهاء</span>':''}</td>
             <td>${r.price?fmtNum(r.price)+' ج.م':'—'}</td>
+            <td>${r.receiptImage ? `<img src="${r.receiptImage}" alt="فاتورة" style="width:42px;height:42px;object-fit:cover;border-radius:7px;border:1px solid var(--line);cursor:pointer;" onclick="openLightbox('${r.receiptImage}')">` : '—'}</td>
             <td><button class="del-btn" onclick="deleteItem('med','receipts','${r.id}')">${ICONS.trash}</button></td></tr>`;
-          }, 6)}
+          }, 7)}
         </tbody>
       </table>
     </div>
@@ -848,7 +958,13 @@ function renderMed(){
 }
 async function addMedReceipt(e){
   e.preventDefault();
-  state.med.receipts.push({id:uid(), _created:Date.now(), date:val('mr_date'), name:val('mr_name'), qty:val('mr_qty'), expiry:val('mr_expiry'), price:val('mr_price')});
+  let receiptImage = null;
+  if(pendingFiles['mr']){
+    try{ receiptImage = await resizeImageFile(pendingFiles['mr']); }
+    catch(err){ showToast('تعذر تحميل صورة الفاتورة، تم الحفظ بدونها'); }
+  }
+  state.med.receipts.push({id:uid(), _created:Date.now(), date:val('mr_date'), name:val('mr_name'), qty:val('mr_qty'), expiry:val('mr_expiry'), price:val('mr_price'), receiptImage});
+  pendingFiles['mr'] = null;
   await saveModule('med'); renderPage('med'); showToast('تم تسجيل استلام الدواء');
   return false;
 }
@@ -958,12 +1074,12 @@ function renderCustody(){
             <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('ex_receipt_camera').click()">📷 التقاط صورة</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('ex_receipt_gallery').click()">🖼️ من المعرض</button>
           </div>
-          <input type="file" id="ex_receipt_camera" accept="image/*" capture="environment" style="display:none" onchange="handleReceiptFileSelect(this)">
-          <input type="file" id="ex_receipt_gallery" accept="image/*" style="display:none" onchange="handleReceiptFileSelect(this)">
+          <input type="file" id="ex_receipt_camera" accept="image/*" capture="environment" style="display:none" onchange="handleReceiptFileSelect(this,'ex')">
+          <input type="file" id="ex_receipt_gallery" accept="image/*" style="display:none" onchange="handleReceiptFileSelect(this,'ex')">
           <div id="ex_receipt_preview" style="display:none; align-items:center; gap:8px; margin-top:6px;">
             <img id="ex_receipt_preview_img" style="width:40px;height:40px;object-fit:cover;border-radius:7px;border:1px solid var(--line);">
             <span style="font-size:12px; color:var(--ink-soft);">تم اختيار صورة</span>
-            <button type="button" class="del-btn" onclick="clearReceiptFile()">${ICONS.trash}</button>
+            <button type="button" class="del-btn" onclick="clearReceiptFile('ex')">${ICONS.trash}</button>
           </div>
         </div>
         <button class="btn btn-gold" type="submit">تسجيل المصروف</button>
@@ -990,36 +1106,36 @@ async function addCustody(e){
   await saveModule('custody'); renderPage('custody'); showToast('تم تسجيل العُهدة');
   return false;
 }
-let pendingReceiptFile = null;
-function handleReceiptFileSelect(inputEl){
+let pendingFiles = {}; // keyed by form prefix, e.g. 'ex', 'fr', 'mr'
+function handleReceiptFileSelect(inputEl, key){
   const file = inputEl.files && inputEl.files[0];
   if(!file) return;
-  pendingReceiptFile = file;
+  pendingFiles[key] = file;
   const reader = new FileReader();
   reader.onload = e=>{
-    document.getElementById('ex_receipt_preview_img').src = e.target.result;
-    document.getElementById('ex_receipt_preview').style.display = 'flex';
+    document.getElementById(key+'_receipt_preview_img').src = e.target.result;
+    document.getElementById(key+'_receipt_preview').style.display = 'flex';
   };
   reader.readAsDataURL(file);
   // reset the other input so selecting again re-triggers change even for the same file
-  const other = inputEl.id === 'ex_receipt_camera' ? document.getElementById('ex_receipt_gallery') : document.getElementById('ex_receipt_camera');
+  const other = inputEl.id === key+'_receipt_camera' ? document.getElementById(key+'_receipt_gallery') : document.getElementById(key+'_receipt_camera');
   if(other) other.value = '';
 }
-function clearReceiptFile(){
-  pendingReceiptFile = null;
-  document.getElementById('ex_receipt_camera').value = '';
-  document.getElementById('ex_receipt_gallery').value = '';
-  document.getElementById('ex_receipt_preview').style.display = 'none';
+function clearReceiptFile(key){
+  pendingFiles[key] = null;
+  document.getElementById(key+'_receipt_camera').value = '';
+  document.getElementById(key+'_receipt_gallery').value = '';
+  document.getElementById(key+'_receipt_preview').style.display = 'none';
 }
 async function addExpense(e){
   e.preventDefault();
   let receiptImage = null;
-  if(pendingReceiptFile){
-    try{ receiptImage = await resizeImageFile(pendingReceiptFile); }
+  if(pendingFiles['ex']){
+    try{ receiptImage = await resizeImageFile(pendingFiles['ex']); }
     catch(err){ showToast('تعذر تحميل صورة الفاتورة، تم الحفظ بدونها'); }
   }
   state.custody.expenses.push({id:uid(), _created:Date.now(), date:val('ex_date'), item:val('ex_item'), amount:val('ex_amount'), person:val('ex_person'), receiptImage});
-  pendingReceiptFile = null;
+  pendingFiles['ex'] = null;
   await saveModule('custody'); renderPage('custody'); showToast('تم تسجيل المصروف');
   return false;
 }
